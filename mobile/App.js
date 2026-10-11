@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { supabase, hasSupabaseConfig } from './lib/supabase';
 
 const C = {
   ink: '#F6F8FF', muted: '#A4ADC2', purple: '#9C83FF', pale: '#17182A',
@@ -104,8 +105,8 @@ function Profile({ user, onLogout }) {
     <ScrollView contentContainerStyle={styles.page}>
       <Text style={styles.pageTitle}>Profil</Text>
       <View style={styles.profileCard}>
-        <View style={styles.avatar}><Text style={styles.avatarText}>{(user?.name || 'H').slice(0, 1).toUpperCase()}</Text></View>
-        <Text style={styles.featureTitle}>{user?.name || 'Helpora üyesi'}</Text>
+        <View style={styles.avatar}><Text style={styles.avatarText}>{(user?.user_metadata?.display_name || user?.email || 'H').slice(0, 1).toUpperCase()}</Text></View>
+        <Text style={styles.featureTitle}>{user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Helpora üyesi'}</Text>
         <Text style={styles.body}>{user?.email || ''}</Text>
         <Text style={styles.localTag}>Deneme oturumu · yalnızca bu cihazda</Text>
       </View>
@@ -157,19 +158,35 @@ const tabs = [
   { id: 'profile', label: 'Profil', icon: '◯' },
 ];
 
-function AuthFlow({ onComplete }) {
+function AuthFlow({ onComplete, isConfigured }) {
   const [mode, setMode] = useState('welcome');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  function submit() {
+  async function submit() {
     setError('');
+    setMessage('');
+    if (!isConfigured || !supabase) return setError('Sunucu bağlantısı henüz kurulmadı.');
     if (mode === 'register' && name.trim().length < 2) return setError('Adını en az 2 harfle yaz.');
     if (!email.includes('@')) return setError('Geçerli bir e-posta adresi yaz.');
-    if (password.length < 6) return setError('Şifre en az 6 karakter olmalı.');
-    onComplete({ name: name.trim() || email.split('@')[0], email: email.trim() });
+    if (password.length < 8) return setError('Şifre en az 8 karakter olmalı.');
+    setBusy(true);
+    try {
+      const result = mode === 'login'
+        ? await supabase.auth.signInWithPassword({ email: email.trim(), password })
+        : await supabase.auth.signUp({ email: email.trim(), password, options: { data: { display_name: name.trim() } } });
+      if (result.error) setError(result.error.message);
+      else if (result.data.session && result.data.user) onComplete(result.data.user);
+      else if (result.data.user) setMessage('Hesabın oluşturuldu. Giriş yapmadan önce e-postanı doğrula.');
+    } catch {
+      setError('Bağlantı kurulamadı. İnternetini ve Supabase ayarlarını kontrol et.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -194,9 +211,9 @@ function AuthFlow({ onComplete }) {
             {mode === 'register' && <TextInput value={name} onChangeText={setName} placeholder="Adın" placeholderTextColor={C.muted} style={styles.input} autoCapitalize="words" />}
             <TextInput value={email} onChangeText={setEmail} placeholder="E-posta" placeholderTextColor={C.muted} style={styles.input} keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
             <TextInput value={password} onChangeText={setPassword} placeholder="Şifre" placeholderTextColor={C.muted} style={styles.input} secureTextEntry autoCapitalize="none" />
-            {!!error && <Text style={styles.error}>{error}</Text>}
-            <ActionButton title={mode === 'login' ? 'Giriş yap' : 'Hesap oluştur'} onPress={submit} />
-            <Text style={[styles.authFoot, styles.center]}>Bu giriş/kayıt ekranı şu an önizlemedir. Güvenli hesap ve şifre sistemi için sunucu bağlantısı gerekir.</Text>
+            {!!error && <Text style={styles.error}>{error}</Text>}{!!message && <Text style={styles.success}>{message}</Text>}
+            <ActionButton title={busy ? 'Bekle…' : mode === 'login' ? 'Giriş yap' : 'Hesap oluştur'} onPress={busy ? undefined : submit} />
+            <Text style={[styles.authFoot, styles.center]}>{isConfigured ? 'Şifren Supabase üzerinden güvenli biçimde doğrulanır.' : 'Gerçek hesap açmak için Supabase sunucu ayarları bekleniyor.'}</Text>
           </>
         )}
       </ScrollView>
@@ -206,7 +223,20 @@ function AuthFlow({ onComplete }) {
 
 export default function App() {
   const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
   const [tab, setTab] = useState('home');
+
+  useEffect(() => {
+    if (!hasSupabaseConfig || !supabase) { setAuthReady(true); return; }
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (active) { setUser(data.session?.user ?? null); setAuthReady(true); }
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => { active = false; subscription.unsubscribe(); };
+  }, []);
   const [creating, setCreating] = useState(false);
   const [requests, setRequests] = useState(initialRequests);
 
@@ -216,14 +246,15 @@ export default function App() {
     setTab('requests');
   }
 
-  if (!user) return <SafeAreaView style={styles.safe}><StatusBar style="light" /><AuthFlow onComplete={setUser} /></SafeAreaView>;
+  if (!authReady) return <SafeAreaView style={styles.safe}><StatusBar style="light" /><View style={styles.loading}><Text style={styles.body}>Helpora açılıyor…</Text></View></SafeAreaView>;
+  if (!user) return <SafeAreaView style={styles.safe}><StatusBar style="light" /><AuthFlow onComplete={setUser} isConfigured={hasSupabaseConfig} /></SafeAreaView>;
 
   let screen;
   if (creating) screen = <CreateRequest onCancel={() => setCreating(false)} onSave={saveRequest} />;
   else if (tab === 'home') screen = <Home onCreate={() => setCreating(true)} onRequests={() => setTab('requests')} />;
   else if (tab === 'requests') screen = <Requests requests={requests} onCreate={() => setCreating(true)} />;
   else if (tab === 'community') screen = <Community />;
-  else screen = <Profile user={user} onLogout={() => { setUser(null); setTab('home'); }} />;
+  else screen = <Profile user={user} onLogout={async () => { await supabase?.auth.signOut(); setUser(null); setTab('home'); }} />;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -253,6 +284,8 @@ const styles = StyleSheet.create({
   authTitle: { color: C.ink, fontSize: 29, lineHeight: 35, fontWeight: '800', textAlign: 'center', marginTop: 12 },
   authFoot: { color: C.muted, fontSize: 11, lineHeight: 16, marginTop: 14 },
   error: { color: '#FF7D9B', fontSize: 13, fontWeight: '600' },
+  success: { color: C.green, fontSize: 13, fontWeight: '600' },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   profileCard: { backgroundColor: C.surface, borderColor: C.line, borderWidth: 1, borderRadius: 20, padding: 24, alignItems: 'center', gap: 9, marginTop: 18 },
   avatar: { width: 70, height: 70, borderRadius: 24, backgroundColor: C.pale, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   avatarText: { color: C.cyan, fontSize: 30, fontWeight: '800' },
