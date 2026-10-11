@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Helpora",
+    "slug": "helpora",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.helpora.app"
+    },
+    "android": {
+      "package": "com.helpora.app"
+    }
+  }
+}
