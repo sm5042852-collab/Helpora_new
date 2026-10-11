@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
-export const hasSupabaseConfig = Boolean(url && key && !url.includes('YOUR_PROJECT'));
+export const hasSupabaseConfig = Boolean(url && key && !url.includes('YOUR_PROJECT') && !key.includes('YOUR_SUPABASE') && !key.includes('YOUR_KEY'));
 export const supabase = hasSupabaseConfig
   ? createClient(url, key, {
       auth: {
