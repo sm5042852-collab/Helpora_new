@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
 const C = {
@@ -28,6 +28,13 @@ function Home({ onCreate, onRequests }) {
   return (
     <ScrollView contentContainerStyle={styles.page}>
       <View style={styles.hero}>
+        <View style={styles.brandRow}>
+          <Image source={require('./assets/icon.png')} style={styles.brandLogo} />
+          <View>
+            <Text style={styles.brandName}>HELPORA</Text>
+            <Text style={styles.brandTagline}>Birlikte daha güçlüyüz.</Text>
+          </View>
+        </View>
         <Text style={styles.eyebrow}>HELPORA · YAN YANA</Text>
         <Text style={styles.heroTitle}>İyilik, bir adımla başlar.</Text>
         <Text style={styles.heroBody}>Yardım iste, destek ol, bulunduğun yerde bağ kur.</Text>
@@ -188,6 +195,10 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   page: { padding: 22, paddingBottom: 30, gap: 16 },
   hero: { padding: 23, borderRadius: 26, backgroundColor: C.pale, marginBottom: 6 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 },
+  brandLogo: { width: 54, height: 54, borderRadius: 15 },
+  brandName: { color: C.ink, fontSize: 17, fontWeight: '900', letterSpacing: 1.5 },
+  brandTagline: { color: C.muted, fontSize: 12, marginTop: 3 },
   eyebrow: { color: C.purple, fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginBottom: 14 },
   heroTitle: { color: C.ink, fontSize: 32, lineHeight: 37, fontWeight: '800', letterSpacing: -0.6 },
   heroBody: { color: C.muted, fontSize: 15, lineHeight: 22, marginTop: 10 },
