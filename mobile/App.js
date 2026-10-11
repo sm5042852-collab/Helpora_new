@@ -3,14 +3,9 @@ import { Image, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollV
 import { StatusBar } from 'expo-status-bar';
 
 const C = {
-  ink: '#15213B',
-  muted: '#68738A',
-  purple: '#6655D9',
-  pale: '#F2F0FF',
-  bg: '#F7F8FC',
-  white: '#FFFFFF',
-  line: '#E5E8F0',
-  green: '#1C8B68',
+  ink: '#F6F8FF', muted: '#A4ADC2', purple: '#9C83FF', pale: '#17182A',
+  bg: '#080B16', white: '#FFFFFF', surface: '#12182A', line: '#252F46',
+  green: '#68E5BE', cyan: '#62DFFF',
 };
 
 const categories = ['Günlük destek', 'Eşya', 'Ulaşım', 'Dil desteği', 'Diğer'];
@@ -104,15 +99,23 @@ function Community() {
   );
 }
 
-function Profile() {
+function Profile({ user, onLogout }) {
   return (
     <ScrollView contentContainerStyle={styles.page}>
       <Text style={styles.pageTitle}>Profil</Text>
-      <View style={styles.empty}>
-        <Text style={styles.emptyIcon}>👤</Text>
-        <Text style={styles.featureTitle}>Hesap sistemi sıradaki aşamada</Text>
-        <Text style={[styles.body, styles.center]}>Bu prototipte kayıt ve giriş yapılmıyor. Gerçek hesap bilgisi istemiyoruz.</Text>
+      <View style={styles.profileCard}>
+        <View style={styles.avatar}><Text style={styles.avatarText}>{(user?.name || 'H').slice(0, 1).toUpperCase()}</Text></View>
+        <Text style={styles.featureTitle}>{user?.name || 'Helpora üyesi'}</Text>
+        <Text style={styles.body}>{user?.email || ''}</Text>
+        <Text style={styles.localTag}>Deneme oturumu · yalnızca bu cihazda</Text>
       </View>
+      <View style={styles.menuCard}>
+        <Text style={styles.menuRow}>🔔   Bildirim tercihleri</Text>
+        <Text style={styles.menuRow}>🌐   Dil ve bölge</Text>
+        <Text style={styles.menuRow}>🛡️   Güvenlik ve gizlilik</Text>
+        <Text style={styles.menuRow}>❓   Yardım merkezi</Text>
+      </View>
+      <ActionButton title="Çıkış yap" onPress={onLogout} secondary />
     </ScrollView>
   );
 }
@@ -154,7 +157,55 @@ const tabs = [
   { id: 'profile', label: 'Profil', icon: '◯' },
 ];
 
+function AuthFlow({ onComplete }) {
+  const [mode, setMode] = useState('welcome');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  function submit() {
+    setError('');
+    if (mode === 'register' && name.trim().length < 2) return setError('Adını en az 2 harfle yaz.');
+    if (!email.includes('@')) return setError('Geçerli bir e-posta adresi yaz.');
+    if (password.length < 6) return setError('Şifre en az 6 karakter olmalı.');
+    onComplete({ name: name.trim() || email.split('@')[0], email: email.trim() });
+  }
+
+  return (
+    <KeyboardAvoidingView style={styles.authWrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.authPage} keyboardShouldPersistTaps="handled">
+        <Image source={require('./assets/icon.png')} style={styles.authLogo} />
+        <Text style={styles.authBrand}>HELPORA</Text>
+        <Text style={styles.authTagline}>Birlikte daha güçlüyüz.</Text>
+        {mode === 'welcome' ? (
+          <>
+            <Text style={styles.authTitle}>İyilik, yan yana başlayınca büyür.</Text>
+            <Text style={[styles.body, styles.center]}>Yakınındaki insanlarla dayanışma kur.</Text>
+            <ActionButton title="Giriş yap" onPress={() => setMode('login')} />
+            <ActionButton title="Ücretsiz hesap oluştur" onPress={() => setMode('register')} secondary />
+            <Text style={[styles.authFoot, styles.center]}>Önizleme sürümü · gerçek hesap bağlantısı henüz yok</Text>
+          </>
+        ) : (
+          <>
+            <Pressable onPress={() => { setMode('welcome'); setError(''); }}><Text style={styles.back}>‹  Geri</Text></Pressable>
+            <Text style={styles.authTitle}>{mode === 'login' ? 'Tekrar hoş geldin' : 'Aramıza katıl'}</Text>
+            <Text style={styles.body}>{mode === 'login' ? 'Giriş bilgilerini yaz.' : 'Yeni hesabını oluştur.'}</Text>
+            {mode === 'register' && <TextInput value={name} onChangeText={setName} placeholder="Adın" placeholderTextColor={C.muted} style={styles.input} autoCapitalize="words" />}
+            <TextInput value={email} onChangeText={setEmail} placeholder="E-posta" placeholderTextColor={C.muted} style={styles.input} keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
+            <TextInput value={password} onChangeText={setPassword} placeholder="Şifre" placeholderTextColor={C.muted} style={styles.input} secureTextEntry autoCapitalize="none" />
+            {!!error && <Text style={styles.error}>{error}</Text>}
+            <ActionButton title={mode === 'login' ? 'Giriş yap' : 'Hesap oluştur'} onPress={submit} />
+            <Text style={[styles.authFoot, styles.center]}>Bu giriş/kayıt ekranı şu an önizlemedir. Güvenli hesap ve şifre sistemi için sunucu bağlantısı gerekir.</Text>
+          </>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
 export default function App() {
+  const [user, setUser] = useState(null);
   const [tab, setTab] = useState('home');
   const [creating, setCreating] = useState(false);
   const [requests, setRequests] = useState(initialRequests);
@@ -165,16 +216,18 @@ export default function App() {
     setTab('requests');
   }
 
+  if (!user) return <SafeAreaView style={styles.safe}><StatusBar style="light" /><AuthFlow onComplete={setUser} /></SafeAreaView>;
+
   let screen;
   if (creating) screen = <CreateRequest onCancel={() => setCreating(false)} onSave={saveRequest} />;
   else if (tab === 'home') screen = <Home onCreate={() => setCreating(true)} onRequests={() => setTab('requests')} />;
   else if (tab === 'requests') screen = <Requests requests={requests} onCreate={() => setCreating(true)} />;
   else if (tab === 'community') screen = <Community />;
-  else screen = <Profile />;
+  else screen = <Profile user={user} onLogout={() => { setUser(null); setTab('home'); }} />;
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       <View style={styles.flex}>{screen}</View>
       {!creating && (
         <View style={styles.tabBar}>
@@ -192,6 +245,19 @@ export default function App() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
+  authWrap: { flex: 1, backgroundColor: C.bg },
+  authPage: { flexGrow: 1, justifyContent: 'center', padding: 26, paddingTop: 48, paddingBottom: 36, gap: 15 },
+  authLogo: { width: 94, height: 94, borderRadius: 26, alignSelf: 'center', marginBottom: 4 },
+  authBrand: { color: C.ink, fontSize: 25, fontWeight: '900', letterSpacing: 3, textAlign: 'center' },
+  authTagline: { color: C.cyan, fontSize: 14, fontWeight: '600', textAlign: 'center', marginBottom: 20 },
+  authTitle: { color: C.ink, fontSize: 29, lineHeight: 35, fontWeight: '800', textAlign: 'center', marginTop: 12 },
+  authFoot: { color: C.muted, fontSize: 11, lineHeight: 16, marginTop: 14 },
+  error: { color: '#FF7D9B', fontSize: 13, fontWeight: '600' },
+  profileCard: { backgroundColor: C.surface, borderColor: C.line, borderWidth: 1, borderRadius: 20, padding: 24, alignItems: 'center', gap: 9, marginTop: 18 },
+  avatar: { width: 70, height: 70, borderRadius: 24, backgroundColor: C.pale, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  avatarText: { color: C.cyan, fontSize: 30, fontWeight: '800' },
+  menuCard: { backgroundColor: C.surface, borderColor: C.line, borderWidth: 1, borderRadius: 18, paddingHorizontal: 16, marginTop: 4 },
+  menuRow: { color: C.ink, fontSize: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.line },
   flex: { flex: 1 },
   page: { padding: 22, paddingBottom: 30, gap: 16 },
   hero: { padding: 23, borderRadius: 26, backgroundColor: C.pale, marginBottom: 6 },
@@ -205,10 +271,10 @@ const styles = StyleSheet.create({
   heroActions: { gap: 10, marginTop: 20 },
   actionButton: { minHeight: 50, borderRadius: 15, backgroundColor: C.purple, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
   actionText: { color: C.white, fontWeight: '700', fontSize: 15 },
-  secondaryButton: { backgroundColor: C.white, borderWidth: 1, borderColor: C.line },
+  secondaryButton: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.line },
   secondaryText: { color: C.ink },
   sectionTitle: { color: C.ink, fontSize: 19, fontWeight: '800', marginTop: 4 },
-  featureCard: { backgroundColor: C.white, borderColor: C.line, borderWidth: 1, borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14 },
+  featureCard: { backgroundColor: C.surface, borderColor: C.line, borderWidth: 1, borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14 },
   featureIcon: { fontSize: 25 },
   featureCopy: { flex: 1, gap: 5 },
   featureTitle: { color: C.ink, fontSize: 16, fontWeight: '800' },
@@ -216,14 +282,14 @@ const styles = StyleSheet.create({
   notice: { backgroundColor: '#EDF7F3', borderRadius: 16, padding: 16, gap: 6, marginTop: 2 },
   noticeTitle: { color: C.green, fontWeight: '800', fontSize: 14 },
   pageTitle: { color: C.ink, fontSize: 28, lineHeight: 34, fontWeight: '800', marginTop: 5 },
-  empty: { alignItems: 'center', justifyContent: 'center', backgroundColor: C.white, borderColor: C.line, borderWidth: 1, borderRadius: 20, padding: 24, gap: 12, marginTop: 22 },
+  empty: { alignItems: 'center', justifyContent: 'center', backgroundColor: C.surface, borderColor: C.line, borderWidth: 1, borderRadius: 20, padding: 24, gap: 12, marginTop: 22 },
   emptyIcon: { fontSize: 35, marginBottom: 3 },
   center: { textAlign: 'center' },
-  requestCard: { backgroundColor: C.white, borderColor: C.line, borderWidth: 1, borderRadius: 18, padding: 17, gap: 9 },
+  requestCard: { backgroundColor: C.surface, borderColor: C.line, borderWidth: 1, borderRadius: 18, padding: 17, gap: 9 },
   categoryTag: { color: C.purple, fontSize: 12, fontWeight: '800' },
   localTag: { color: C.green, fontSize: 12, fontWeight: '700', marginTop: 2 },
   label: { color: C.ink, fontWeight: '700', marginTop: 4 },
-  input: { borderColor: C.line, borderWidth: 1, borderRadius: 13, backgroundColor: C.white, padding: 14, color: C.ink, fontSize: 15 },
+  input: { borderColor: C.line, borderWidth: 1, borderRadius: 13, backgroundColor: C.surface, padding: 14, color: C.ink, fontSize: 15 },
   multiline: { minHeight: 110 },
   helper: { color: C.muted, fontSize: 12, lineHeight: 18 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -232,7 +298,7 @@ const styles = StyleSheet.create({
   chipText: { color: C.muted, fontSize: 12, fontWeight: '600' },
   chipTextSelected: { color: C.purple },
   back: { color: C.purple, fontSize: 16, fontWeight: '700', marginBottom: 4 },
-  tabBar: { flexDirection: 'row', backgroundColor: C.white, borderTopColor: C.line, borderTopWidth: 1, paddingTop: 9, paddingBottom: Platform.OS === 'ios' ? 8 : 10 },
+  tabBar: { flexDirection: 'row', backgroundColor: C.surface, borderTopColor: C.line, borderTopWidth: 1, paddingTop: 9, paddingBottom: Platform.OS === 'ios' ? 8 : 10 },
   tab: { flex: 1, alignItems: 'center', gap: 3 },
   tabIcon: { color: C.muted, fontSize: 20, fontWeight: '600' },
   activeTab: { color: C.purple },
