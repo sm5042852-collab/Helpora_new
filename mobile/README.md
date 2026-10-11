@@ -1,17 +1,20 @@
 # Helpora Mobile
 
-Cross-platform Helpora prototype for iOS and Android, built with Expo and React Native.
+iPhone and Android app built with Expo and React Native.
 
 ## Run on a phone
-1. Install Node.js LTS on the computer.
-2. Install **Expo Go** from the App Store or Google Play on the phone.
-3. In this folder run `npm install`, then `npx expo start`.
-4. Scan the displayed QR code with Expo Go. Keep the computer and phone on the same network.
 
-## Current prototype
-- Shared iOS and Android app shell
-- Home, help requests, community, and profile screens
-- Create a help request with category, title, and description
-- Requests are held in app memory on the device only
+1. Install Node.js and Expo Go.
+2. In the `mobile` folder run `npm install`.
+3. Run `npx expo start` and scan the QR code with Expo Go.
+4. Expo Go and Expo CLI must use the same Expo account on a physical iPhone.
 
-Authentication, cloud storage, live community posts, maps, and notifications are not connected yet. This is a test prototype, not a deployed store app.
+## Backend setup
+
+1. Create a Supabase project.
+2. In the Supabase SQL Editor, run `supabase/schema.sql`.
+3. Copy `.env.example` to `.env`.
+4. Fill in `EXPO_PUBLIC_SUPABASE_URL` and the project's publishable key.
+5. Restart Expo with `npx expo start -c`.
+
+The app has a branded welcome screen, login and registration forms, home, help requests, community, and profile navigation. Authentication and cloud data are prepared for Supabase. Until the Supabase project keys are added, sign-in and registration show a setup message and cannot create real accounts. Do not put a Supabase secret/service-role key in the mobile app.
